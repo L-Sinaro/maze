@@ -1,0 +1,584 @@
+#include "sdl.h"
+
+
+void end_sdl(char ok,                                                 // fin normale : ok = 0 ; anormale ok = 1
+                  char const* msg,                                    // message à afficher
+                  SDL_Window* window,                                 // fenêtre à fermer
+                  SDL_Renderer* renderer) {                           // renderer à fermer
+    char msg_formated[255];                                         
+    int l;                                                          
+
+    if (!ok) {                                                      
+        strncpy(msg_formated, msg, 250);                                 
+        l = strlen(msg_formated);                                        
+        strcpy(msg_formated + l, " : %s\n");                     
+
+        SDL_Log(msg_formated, SDL_GetError());                   
+    }                                                               
+
+    if (renderer != NULL) SDL_DestroyRenderer(renderer);                            
+    if (window != NULL)   SDL_DestroyWindow(window);                                        
+
+    SDL_Quit();                                                     
+
+    if (!ok) 
+    {                                                      
+        exit(EXIT_FAILURE);                                              
+    }                                                               
+}
+
+SDL_Texture* loadTextureFromImage(char  *  file_image_name, SDL_Window *window, SDL_Renderer *renderer )
+{
+    SDL_Surface *my_image = NULL;           
+    SDL_Texture* my_texture = NULL;         
+
+    my_image = IMG_Load(file_image_name);   
+
+    my_texture = SDL_CreateTextureFromSurface(renderer, my_image); 
+    SDL_FreeSurface(my_image);                                     
+    if (my_texture == NULL) end_sdl(0, "Echec de la transformation de la surface en texture", window, renderer);
+
+    return my_texture;
+}
+
+
+Offset_t getOffset(int v)
+{
+    Offset_t offset;
+    switch (v)
+    {
+    case 0:
+        offset.i = 2;
+        offset.j = 5;
+        break;        
+    case NORD:
+        offset.i = 0;
+        offset.j = 1;
+        break;
+    case SUD:
+        offset.i = 1;
+        offset.j = 7;
+        break;
+    case EST:
+        offset.i = 2;
+        offset.j = 4;
+        break;
+    case OUEST:
+        offset.i = 1;
+        offset.j = 5;
+        break;
+    case NORD+SUD:
+        offset.i = 3;
+        offset.j = 4;
+        break;
+    case NORD+EST:
+        offset.i = 2;
+        offset.j = 2;
+        break;
+    case NORD+OUEST:
+        offset.i = 0;
+        offset.j = 0;
+        break;
+    case SUD+EST:
+        offset.i = 0;
+        offset.j = 7;
+        break;
+    case SUD+OUEST:
+        offset.i = 1;
+        offset.j = 6;
+        break; 
+    case EST+OUEST:
+        offset.i = 0;
+        offset.j = 6;
+        break;  
+    case NORD+SUD+EST:
+        offset.i = 1;
+        offset.j = 4;
+        break;
+    case NORD+SUD+OUEST:
+        offset.i = 0;
+        offset.j = 5;
+        break;
+    case NORD+EST+OUEST:
+        offset.i = 2;
+        offset.j = 1;
+        break;
+    case SUD+EST+OUEST:
+        offset.i = 3;
+        offset.j = 0;
+        break;                
+    default:
+        offset.i = 3;
+        offset.j = 6;    
+        break;
+    }
+
+    return offset;
+}
+
+
+
+static void drawWalls(SDL_Renderer * renderer, SDL_Window* window, labyrinthe_t labyrinthe)
+{
+    int i, j;
+
+    int widthWindow, heightWindow;
+    SDL_GetWindowSize(window, &widthWindow, &heightWindow);
+
+    
+    int widthRectangle = widthWindow / labyrinthe.colonnes;
+    int heightRectangle = heightWindow / labyrinthe.lignes;
+
+    for (i=0; i<labyrinthe.lignes; i++)
+    {
+        for (j=0; j<labyrinthe.colonnes; j++)
+        {
+            if (labyrinthe.tab[i][j] & NORD)
+            {
+                SDL_RenderDrawLine(renderer, j*widthRectangle, i*heightRectangle, (j+1)*widthRectangle, i*heightRectangle);
+            }
+            if (labyrinthe.tab[i][j] & SUD)
+            {
+                SDL_RenderDrawLine(renderer, j*widthRectangle, (i+1)*heightRectangle, (j+1)*widthRectangle, (i+1)*heightRectangle);
+            }
+            if (labyrinthe.tab[i][j] & EST)
+            {
+                SDL_RenderDrawLine(renderer, (j+1)*widthRectangle, i*heightRectangle, (j+1)*widthRectangle, (i+1)*heightRectangle);
+            }
+            if (labyrinthe.tab[i][j] & OUEST)
+            {
+                SDL_RenderDrawLine(renderer, j*widthRectangle, i*heightRectangle, j*widthRectangle, (i+1)*heightRectangle);
+            }
+        }
+    }
+}
+
+void drawRectangle(SDL_Window * window, SDL_Renderer * renderer, labyrinthe_t labyrinthe, SDL_Rect rectangle)
+{
+
+    int widthWindow, heightWindow;
+
+    SDL_GetWindowSize(window, &widthWindow, &heightWindow);
+    rectangle.w = widthWindow / labyrinthe.colonnes;
+    rectangle.h = heightWindow / labyrinthe.lignes;
+
+    SDL_SetRenderDrawColor(renderer, 99, 29, 17, 255);
+    SDL_RenderFillRect(renderer, &rectangle);
+}
+
+void drawCar(SDL_Window * window, SDL_Renderer * renderer, SDL_Texture * texture, SDL_Rect car, Offset_t offset)
+{
+    SDL_Rect source;
+    SDL_Rect state;
+    SDL_Rect destination;
+    int widthWindow, heightWindow;
+    int nbOfFrames = 4;
+
+    float zoom = 0.3;
+
+    SDL_QueryTexture(texture, NULL, NULL,    // Récupération des dimensions de l'image
+                    &source.w, &source.h); 
+
+    state.x = 0;
+    state.y = 0;
+    state.w = source.w * offset.j / nbOfFrames;
+    state.h = source.h * offset.i;
+
+    car.w = state.w * zoom;
+    car.h = state.h * zoom;
+
+    // SDL_GetWindowSize(window, &widthWindow, &heightWindow);
+    // rectangle.w = widthWindow / labyrinthe.colonnes;
+    // rectangle.h = heightWindow / labyrinthe.lignes;
+
+    SDL_RenderCopy(renderer, texture,
+                        &state,
+                        &car);
+
+    // SDL_SetRenderDrawColor(renderer, 99, 29, 17, 255);
+    // SDL_RenderFillRect(renderer, &rectangle);
+}
+
+
+static void drawTiles(SDL_Renderer * renderer, SDL_Window* window, labyrinthe_t labyrinthe)
+{
+    int i, j;
+    SDL_Rect tile;
+
+    SDL_Rect source;
+    SDL_Rect state;
+    SDL_Texture * texture = loadTextureFromImage("assets/spritesheet.png", window, renderer);
+    int heightTexture = 9;
+    int widthTexture = 9;
+
+    Offset_t offset;
+
+    SDL_QueryTexture(texture, NULL, NULL,    // Récupération des dimensions de l'image
+                    &source.w, &source.h); 
+    state.w = source.w / widthTexture;
+    state.h = source.h / heightTexture;
+
+    int widthWindow, heightWindow;
+    SDL_GetWindowSize(window, &widthWindow, &heightWindow);
+
+    tile.w = widthWindow / labyrinthe.colonnes;
+    tile.h = heightWindow / labyrinthe.lignes;
+
+    for (i=0; i<labyrinthe.lignes; i++)
+    {
+        for (j=0; j<labyrinthe.colonnes; j++)
+        {
+            tile.x = j*tile.w;
+            tile.y = i*tile.h;
+            offset = getOffset(labyrinthe.tab[i][j]);
+            state.x = offset.j * source.w / widthTexture;
+            state.y = offset.i * source.h / heightTexture;
+
+            SDL_RenderCopy(renderer, texture,
+                    &state,
+                    &tile);  
+        }
+    }
+}
+
+void moveCarDown(SDL_Window * window, SDL_Renderer * renderer, SDL_Texture * texture, SDL_Rect car, Coordonnees_t position, labyrinthe_t labyrinthe)
+{
+    int i;
+    int yDepart = car.y;
+    int nb_pas = 20;
+    for (i = 0; i<nb_pas; i++)
+    {
+        car.y = yDepart + (1 - cos(i*M_PI/nb_pas)) * car.h/2;
+        drawTiles(renderer, window, labyrinthe);
+        SDL_SetRenderDrawColor(renderer,139,181,74,255);
+        drawRectangle(window, renderer, labyrinthe, car);
+        SDL_RenderPresent(renderer);
+        SDL_RenderClear(renderer);
+        SDL_Delay(10);
+    }   
+}
+
+void moveCarUp(SDL_Window * window, SDL_Renderer * renderer, SDL_Texture * texture, SDL_Rect car, Coordonnees_t position, labyrinthe_t labyrinthe)
+{
+    int i;
+    int yDepart = car.y;
+    int nb_pas = 20;
+    for (i = 0; i<nb_pas; i++)
+    {
+        car.y = yDepart - (1 - cos(i*M_PI/nb_pas)) * car.h/2;
+        drawTiles(renderer, window, labyrinthe);
+        SDL_SetRenderDrawColor(renderer,139,181,74,255);
+        drawRectangle(window, renderer, labyrinthe, car);
+        SDL_RenderPresent(renderer);
+        SDL_RenderClear(renderer);
+        SDL_Delay(10);
+    }   
+}
+
+void moveCarLeft(SDL_Window * window, SDL_Renderer * renderer, SDL_Texture * texture, SDL_Rect car, Coordonnees_t position, labyrinthe_t labyrinthe)
+{
+    int i;
+    int xDepart = car.x;
+    int nb_pas = 20;
+    Offset_t offset;
+    offset.i=0;
+    offset.j=0;
+    for (i = 0; i<nb_pas; i++)
+    {
+        car.x = xDepart - (1 - cos(i*M_PI/nb_pas)) * car.w/2;
+        drawTiles(renderer, window, labyrinthe);
+        SDL_SetRenderDrawColor(renderer,139,181,74,255);
+        drawRectangle(window, renderer, labyrinthe, car);
+        drawCar(window, renderer, texture, car, offset);
+        SDL_RenderPresent(renderer);
+        SDL_RenderClear(renderer);
+        SDL_Delay(10);
+    }   
+}
+
+void moveCarRight(SDL_Window * window, SDL_Renderer * renderer, SDL_Texture * texture, SDL_Rect car, Coordonnees_t position, labyrinthe_t labyrinthe)
+{
+    int i;
+    int xDepart = car.x;
+    int nb_pas = 20;
+    for (i = 0; i<nb_pas; i++)
+    {
+        car.x = xDepart + (1 - cos(i*M_PI/nb_pas)) * car.w/2;
+        drawTiles(renderer, window, labyrinthe);
+        SDL_SetRenderDrawColor(renderer,139,181,74,255);
+        drawRectangle(window, renderer, labyrinthe, car);
+        SDL_RenderPresent(renderer);
+        SDL_RenderClear(renderer);
+        SDL_Delay(10);
+    }   
+}
+
+int carHasArrived(labyrinthe_t labyrinthe, Coordonnees_t position, int ifin, int jfin)
+{
+    return (labyrinthe.tab[position.i][position.j] == labyrinthe.tab[ifin][jfin]);
+}
+
+void affiche_dpt(SDL_Window * window, SDL_Renderer * renderer, SDL_Rect rect_dpt, labyrinthe_t labyrinthe, int idpt, int jdpt)
+{
+    int widthWindow, heightWindow;
+
+    SDL_GetWindowSize(window, &widthWindow, &heightWindow);
+    rect_dpt.w = widthWindow / labyrinthe.colonnes;
+    rect_dpt.h = heightWindow / labyrinthe.lignes;
+    rect_dpt.x = jdpt * rect_dpt.w;
+    rect_dpt.y = idpt * rect_dpt.h;
+
+    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+    SDL_RenderFillRect(renderer, &rect_dpt);    
+}
+
+void affiche_arrivee(SDL_Window * window, SDL_Renderer * renderer, SDL_Rect rect_arr, labyrinthe_t labyrinthe, int ifin, int jfin)
+{
+    int widthWindow, heightWindow;
+
+    SDL_GetWindowSize(window, &widthWindow, &heightWindow);
+    rect_arr.w = widthWindow / labyrinthe.colonnes;
+    rect_arr.h = heightWindow / labyrinthe.lignes;
+    rect_arr.x = jfin * rect_arr.w;
+    rect_arr.y = ifin * rect_arr.h;
+
+    SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
+    SDL_RenderFillRect(renderer, &rect_arr);    
+}
+
+void parcours_plus_court_chemin_labyrinthe(labyrinthe_t labyrinthe, graphe_t graphe )
+{
+    int idpt, jdpt;
+    int ifin, jfin;
+    cellule_t * res;
+    
+
+    generePointDepartArrivee(labyrinthe.lignes, labyrinthe.colonnes, &idpt, &jdpt, &ifin, &jfin);
+
+    int coord_dpt = idpt * labyrinthe.colonnes + jdpt;
+    int coord_fin = ifin * labyrinthe.colonnes + jfin;
+
+    res = plus_court_chemin_djikstra(coord_dpt, coord_fin, graphe);
+
+    
+
+}
+
+void affiche_reussite(SDL_Color color,TTF_Font * font, SDL_Window * window, SDL_Renderer * renderer)
+{
+    SDL_Surface* text_surface = NULL;
+    SDL_Texture* text_texture = NULL;                                    // la texture qui contient le texte 
+
+    int windowHeight, windowWidth;
+    SDL_GetWindowSize(window, &windowWidth, &windowHeight);
+    SDL_Rect pos = {0, 0, 0, 0};                                         // rectangle où le texte va être prositionné
+
+    text_surface = TTF_RenderText_Blended(font, "You win", color); // création du texte dans la surface 
+    if (text_surface == NULL) end_sdl(0, "Can't create text surface", window, renderer);
+
+    text_texture = SDL_CreateTextureFromSurface(renderer, text_surface); // transfert de la surface à la texture
+    if (text_texture == NULL) end_sdl(0, "Can't create texture from surface", window, renderer);
+    SDL_QueryTexture(text_texture, NULL, NULL, &pos.w, &pos.h);          // récupération de la taille (w, h) du texte
+    pos.x = (windowWidth - pos.w)/2;
+    pos.y = (windowHeight - pos.h)/2;
+
+    SDL_RenderCopy(renderer, text_texture, NULL, &pos);                  // Ecriture du texte dans le renderer
+
+    // text_surface = TTF_RenderText_Blended(font, "Press R to play again", color); // création du texte dans la surface 
+    // if (text_surface == NULL) end_sdl(0, "Can't create text surface", window, renderer);
+
+    // text_texture = SDL_CreateTextureFromSurface(renderer, text_surface); // transfert de la surface à la texture
+    // if (text_texture == NULL) end_sdl(0, "Can't create texture from surface", window, renderer);
+    // SDL_QueryTexture(text_texture, NULL, NULL, &pos.w, &pos.h);          // récupération de la taille (w, h) du texte
+    // pos.y = pos.y+pos.h*0.7;
+    // pos.x = pos.x-pos.w*0.2;
+    // SDL_RenderCopy(renderer, text_texture, NULL, &pos);                  // Ecriture du texte dans le renderer
+
+    SDL_DestroyTexture(text_texture);                                    // On n'a plus besoin de la texture avec le texte
+    SDL_FreeSurface(text_surface);                                       // la texture ne sert plus à rien
+}
+
+void launchSDL(labyrinthe_t labyrinthe)
+{
+    SDL_Window* window = NULL;               
+    SDL_Renderer* renderer = NULL;
+    TTF_Font* font = NULL;  
+
+    if (SDL_Init(SDL_INIT_VIDEO) != 0) end_sdl(0, "Error : Couldn't initialize SDL", window, renderer);
+    if (TTF_Init() < 0) end_sdl(0, "Error : Couldn't initialize SDL TTF", window, renderer);
+
+    int windowWidth = 1000;
+    int windowHeight = 500;
+   
+    window = SDL_CreateWindow(
+        "Jeu",                    
+        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+        windowWidth, windowHeight,                              
+        SDL_WINDOW_RESIZABLE);                 
+    if (window == NULL) end_sdl(0, "Error : SDL window creation", window, renderer);
+
+    renderer = SDL_CreateRenderer(
+           window, 
+           -1, 
+           SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    if (renderer == NULL) end_sdl(0, "Error : SDL renderer creation", window, renderer);
+
+    font = TTF_OpenFont("./fonts/Some-Time-Later.ttf", 100);
+    if (font == NULL) end_sdl(0, "Can't load font", window, renderer);
+
+
+
+    SDL_bool program_on = SDL_TRUE,
+             paused = SDL_FALSE;
+    // SDL_Color colorOfTheText = {0, 0, 0, 255};
+
+
+    SDL_Texture * carTexture = loadTextureFromImage("assets/Voiture_stylax.png", window, renderer);
+    
+    SDL_Rect car, dpt, arr;
+    car.x = 0;
+    car.y = 0;
+
+    int ifin, jfin;
+    int idpt, jdpt;    
+
+    generePointDepartArrivee(labyrinthe.lignes, labyrinthe.colonnes, &idpt, &jdpt, &ifin, &jfin);
+
+    Coordonnees_t carPosition;
+    carPosition.i = idpt;
+    carPosition.j = jdpt;
+
+    SDL_bool win = SDL_FALSE;
+
+    SDL_Color color = {0,0,0,255};
+
+    // int score = 0;
+    // char scorechar [5]; 
+
+    while (program_on) 
+    {                                
+        SDL_Event event;
+        SDL_GetWindowSize(window, &windowWidth, &windowHeight);
+
+        // Si la dimension de la fenetre a changé :
+        if (car.w != windowWidth/labyrinthe.colonnes || car.h != windowHeight/labyrinthe.lignes)
+        {
+            car.w = windowWidth/labyrinthe.colonnes;
+            car.h = windowHeight/labyrinthe.lignes;
+            printf("Changement\n");
+        }
+        
+
+        while (program_on && SDL_PollEvent(&event)) 
+        {                  
+            switch (event.type) {
+            case SDL_QUIT:                              
+                program_on = SDL_FALSE;                    
+                break;
+            case SDL_KEYDOWN:                             
+                                                        
+                                                       
+                switch (event.key.keysym.sym) 
+                {             
+                    case SDLK_p:                                // 'p'
+                    case SDLK_SPACE:                            // 'SPC'
+                        if (!win)
+                        {
+                        paused = !paused;                         // basculement pause/unpause
+                        }
+                        break;
+                    case SDLK_ESCAPE:                           // 'ESCAPE'  
+                    case SDLK_q:                                // 'q'
+                        program_on = 0;                                         
+                        break;
+                    case SDLK_r:
+                        // if (therectangleHasCrashed)
+                        // {
+                        //     replay = SDL_TRUE;
+                        //     therectangleHasCrashed = SDL_FALSE;
+                        //     score = 0;
+                        // }
+                        break; 
+                    case SDLK_UP:    
+                        if (carPosition.i > 0 && !(labyrinthe.tab[carPosition.i][carPosition.j] & NORD) && (!paused) && !(win))
+                        {
+                            moveCarUp(window, renderer, carTexture, car, carPosition, labyrinthe);
+
+                            carPosition.i--;
+                            car.x = carPosition.j* car.w;
+                            car.y = carPosition.i* car.h;                                                        
+                        }                           
+                        break;
+
+                    case SDLK_DOWN:
+                        if (carPosition.i+1 < labyrinthe.lignes && !(labyrinthe.tab[carPosition.i][carPosition.j] & SUD) &&(!paused) && !(win))
+                        {  
+                            moveCarDown(window, renderer, carTexture, car, carPosition, labyrinthe);
+                            carPosition.i++; 
+                            car.x = carPosition.j* car.w;
+                            car.y = carPosition.i* car.h;                                                              
+                        }                          
+                        break;
+
+                    case SDLK_LEFT:    
+                        if (carPosition.j > 0 && !(labyrinthe.tab[carPosition.i][carPosition.j] & OUEST) && (!paused) && !(win))
+                        {
+                            moveCarLeft(window, renderer, carTexture, car, carPosition, labyrinthe);
+                            carPosition.j--;   
+                            car.x = carPosition.j* car.w;
+                            car.y = carPosition.i* car.h;                                                            
+                        }                           
+                        break;
+
+                    case SDLK_RIGHT:    
+                        if (carPosition.j+1 < labyrinthe.colonnes && !(labyrinthe.tab[carPosition.i][carPosition.j] & EST) && (!paused) && !(win))
+                        {
+                            moveCarRight(window, renderer, carTexture, car, carPosition, labyrinthe);
+                            carPosition.j++;    
+                            car.x = carPosition.j* car.w;
+                            car.y = carPosition.i* car.h;                                                         
+                        }                          
+                        break;
+                    default:                                    
+                        printf("Wrong input\n");
+                        break;
+                }
+            break;
+            }
+        }
+
+        car.w = windowWidth / labyrinthe.colonnes;
+        car.h = windowHeight / labyrinthe.lignes;
+        
+        if (!carHasArrived(labyrinthe, carPosition, ifin, jfin))
+        {
+            drawTiles(renderer, window, labyrinthe);
+            // affiche_dpt(window, renderer, dpt, labyrinthe, idpt, jdpt);
+            // affiche_arrivee(window, renderer, arr, labyrinthe, ifin, jfin);
+            car.x = carPosition.j* car.w;
+            car.y = carPosition.i* car.h;
+            drawRectangle(window, renderer, labyrinthe, car);
+
+        }
+        else
+        {   
+            // resetGrid(grid, width, height);
+            // rectangle.x = windowWidth/3;
+            // rectangle.y = windowHeight/2;
+            // 
+            // replay = SDL_FALSE;
+            win = SDL_TRUE;
+            affiche_reussite(color, font, window, renderer);
+        }
+
+        
+        // drawWalls(renderer, window, labyrinthe);
+
+        SDL_RenderPresent(renderer);
+        SDL_SetRenderDrawColor(renderer,139,181,74,255);
+        SDL_RenderClear(renderer);
+        SDL_Delay(30); 
+    }
+    IMG_Quit();
+    end_sdl(1, "Normal ending", window, renderer);
+}

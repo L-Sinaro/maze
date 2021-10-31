@@ -1,0 +1,127 @@
+@font-face {
+    font-family: liberationMono;
+    src: url(../fonts/liberation-mono/LiberationMono-Regular.ttf);
+}
+
+@font-face {
+    font-family: wirewyrm;
+    src: url(../fonts/wirewyrm/WireWyrmMedium.otf);
+}
+
+@font-face {
+    font-family: happy-times;
+    src: url(../fonts/happy-times/happy-times-at-the-ikob.otf);
+}
+
+@font-face {
+    font-family: trebuchet;
+    src: url(../fonts/trebuchet-ms-3-cufonfonts/trebuc.ttf);
+}
+
+p{
+    font-family: happy-times;
+    font-size: 18px;
+}
+
+body h2{
+    margin:0;
+    padding:20px;
+    background-color: #465866;
+    font-size: 22px;
+    color: white;
+}
+
+body h3{
+    margin:0;
+    padding:20px;
+    border-bottom-style: solid;
+    border-bottom-color: #5691DA;
+    border-bottom-width: 3px;
+    font-size: 20px;
+    color: black;
+}
+
+h4{
+    font-size : 2O px;
+}
+h1, h2, h3, h4{
+    font-family: wirewyrm;
+}
+
+
+body{
+    margin: 0;
+    padding:  0;
+}
+
+header{
+    margin:0;
+    padding:20px;
+    background-color: cadetblue;
+    text-align: center;
+}
+
+header p{
+    color : white;      
+}
+
+main{
+    max-width: 1024px;
+    padding:20px;
+    margin: auto;
+    text-align: justify;
+    
+}
+
+main h2
+{
+    text-decoration: underline;
+    font-size:x-large;
+}
+
+main h3{
+    padding-top : 30px;
+    text-align: center;
+}
+
+main h4{
+    text-decoration: underline;
+}
+
+main img
+{
+    width : 100%;
+}
+
+header, footer{
+    padding : 20px;
+    text-align:center;
+    background-color:cadetblue;
+}
+
+footer{
+    color : white;
+}
+
+
+a {
+    outline: none;
+    text-decoration: none;
+    padding: 2px 1px 0;
+    margin : 5px;
+}
+
+a:link {
+    color: #465866;
+}
+
+a:hover {
+    border-bottom: 1px solid;
+    color : white;
+    background: #465866;
+}
+
+a:active {
+    background: #465866;
+    color: cadetblue;
+}
